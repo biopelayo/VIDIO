@@ -1,0 +1,1 @@
+gCfg = None

@@ -1,0 +1,51 @@
+{
+    "db": {
+        "host": "localhost",
+        "port": 5432,
+        "db": "vidio",
+        "user": "admin_vidio",
+        "password": "CHANGE_ME"
+    },
+    "system": {
+        "user": null
+    },
+    "repository": {
+        "location": "d:/data/repo-vidio",
+        "location_windows": "d:/data/repo-vidio"
+    },
+    "server": {
+        "host": "127.0.0.1",
+        "port": 7070
+    },
+    "auth": {
+        "secret_key": "CHANGE_ME_TO_RANDOM_SECRET",
+        "algorithm": "HS256",
+        "expiration_days": 7
+    },
+    "pipelines": {
+        "retinal": {
+            "models_dir": "d:/data/models/retinal",
+            "default_model": "efficientnet_b4_retinal_v1"
+        },
+        "histology": {
+            "models_dir": "d:/data/models/histology",
+            "tile_size": 256,
+            "tissue_threshold": 0.5,
+            "tcga_api_url": "https://api.gdc.cancer.gov"
+        },
+        "radiology": {
+            "models_dir": "d:/data/models/radiology",
+            "default_voxel_spacing": [1.0, 1.0, 1.0],
+            "mni_template_path": "d:/data/templates/MNI152NLin2009cAsym.nii.gz"
+        },
+        "spatial": {
+            "min_genes_per_spot": 200,
+            "min_spots_per_gene": 10,
+            "n_top_genes": 2000
+        }
+    },
+    "processing": {
+        "max_concurrent_jobs": 4,
+        "gpu_device": "cuda:0"
+    }
+}
