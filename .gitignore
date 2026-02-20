@@ -12,6 +12,7 @@ vidio.log
 
 *.env
 .env
+cfg.json
 
 *.pyc
 *.pyo
