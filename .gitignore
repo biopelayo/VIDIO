@@ -34,6 +34,7 @@ uploads/
 *.h5ad
 
 demo_output/
+tcga_demo_output/
 
 .pytest_cache/
 .coverage

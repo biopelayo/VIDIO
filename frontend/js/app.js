@@ -18,6 +18,8 @@ Router.register('/analysis',       pageAnalysis);
 Router.register('/findings',       pageFindings);
 Router.register('/findings/:id',   pageFindingDetail);
 Router.register('/processes',      pageProcesses);
+Router.register('/analytics',      pageAnalyticsDashboard);
+Router.register('/models',         pageModels);
 Router.register('/users',          pageUsers);
 
 // --- Boot ---
