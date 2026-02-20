@@ -1,3 +1,16 @@
+"""
+Uploads Resource
+================
+
+Falcon resource for handling multipart file uploads. Uploaded files are
+persisted to the repository directory configured in ``Cfg.gCfg`` and a
+corresponding database record is created for each file.
+
+Routes
+------
+* ``POST /uploads`` -- upload one or more files via multipart form data.
+"""
+
 import os
 import logging
 import uuid
@@ -10,8 +23,43 @@ from api.util.ImageUtils import detect_format, get_file_size
 
 
 class UploadsResource(BaseResource):
+    """Falcon resource for the ``POST /uploads`` endpoint.
+
+    Accepts ``multipart/form-data`` requests containing one or more file
+    parts named ``file``.  Each file is saved to disk under a UUID-based
+    filename inside the configured repository's ``uploads/`` directory,
+    and a file record is inserted into the database.
+
+    Inherits shared helpers from :class:`~api.resources.BaseResource.BaseResource`.
+    """
 
     def on_post(self, req, resp):
+        """Handle ``POST /uploads`` -- upload files via multipart form data.
+
+        Iterates over all multipart parts named ``file``, writes each to
+        disk with a unique name, records metadata in the database, and
+        returns a summary of all successfully uploaded files.
+
+        Parameters
+        ----------
+        req : falcon.Request
+            A ``multipart/form-data`` request.  Each file part must use
+            the field name ``file``.
+        resp : falcon.Response
+            On success, ``resp.media`` is::
+
+                {"uploaded": [<file_record>, ...]}
+
+        Response Codes
+        --------------
+        * **200** -- all files uploaded and recorded successfully.
+        * **500** -- unexpected server error (e.g. I/O failure).
+
+        Notes
+        -----
+        Files are streamed to disk in 8 KiB chunks to keep memory usage
+        constant regardless of file size.
+        """
         log = logging.getLogger(__name__)
         try:
             user_id = self.get_user_id(req)

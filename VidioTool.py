@@ -1,17 +1,83 @@
 #!/usr/bin/env python3
 """
-VIDIO CLI Tool - Administrative operations for the VIDIO platform.
+VIDIO CLI Tool — Administrative Command-Line Interface
+=======================================================
 
-Usage:
+A command-line utility for performing administrative operations on the
+VIDIO platform without running the web server.  Useful for:
+
+- **Initial setup** : Creating the first admin user.
+- **Data ingestion** : Importing DICOM directories into the database.
+- **Batch analysis** : Triggering pipeline analysis from scripts or cron.
+- **Quick inspection** : Listing findings for a study.
+
+Usage
+-----
+::
+
     python VidioTool.py -t <task> [options]
 
-Tasks:
-    add_user        Add a new user
-    add_patient     Add a new patient
-    add_study       Add a new study
-    run_analysis    Trigger analysis on a study
-    list_findings   List findings for a study
-    import_dicom    Import a DICOM directory
+Available Tasks
+---------------
+``add_user``
+    Create a new platform user with bcrypt-hashed password.
+    Required: ``--username``, ``--password``, ``--name``.
+    Optional: ``--surname``, ``--role`` (default: ``analyst``).
+
+``add_patient``
+    Register a new patient record.
+    Required: ``--name``.
+    Optional: ``--mrn``, ``--sex``, ``--dob``.
+
+``add_study``
+    Create a new imaging study for a patient.
+    Required: ``--patient-id``, ``--modality``.
+    Optional: ``--description``, ``--institution``.
+
+``run_analysis``
+    Trigger a processing pipeline on a study (synchronous — waits for
+    completion).
+    Required: ``--study-id``, ``--modality``.
+    Optional: ``--parameters`` (JSON string).
+
+``list_findings``
+    Display all findings for a study with severity and confidence.
+    Required: ``--study-id``.
+
+``import_dicom``
+    Scan a directory for DICOM files, create a series, and register
+    each file as an image in the database.
+    Required: ``--study-id``, ``--directory``.
+
+Examples
+--------
+::
+
+    # Create admin user
+    python VidioTool.py -t add_user --username admin --password s3cret --name Admin --role admin
+
+    # Register a patient
+    python VidioTool.py -t add_patient --name "Jane Doe" --mrn MRN001 --sex F --dob 1965-03-15
+
+    # Import DICOM directory
+    python VidioTool.py -t import_dicom --study-id <UUID> --directory /data/dicom/patient001/
+
+    # Run retinal analysis
+    python VidioTool.py -t run_analysis --study-id <UUID> --modality retinal
+
+    # Check results
+    python VidioTool.py -t list_findings --study-id <UUID>
+
+Configuration
+-------------
+The tool reads ``cfg.json`` from its own directory and initialises the
+database connection automatically.  On Windows, the repository path is
+switched to ``location_windows`` from the config.
+
+See Also
+--------
+:mod:`app` : WSGI web server entry point.
+:mod:`ProcessManagement` : Async pipeline launcher.
 """
 
 import os
@@ -28,6 +94,21 @@ log = logging.getLogger('VidioTool')
 
 
 def load_config():
+    """Load ``cfg.json`` and initialise the database connection.
+
+    Reads the configuration file from the same directory as this script,
+    sets the global config singleton (:data:`api.Cfg.gCfg`), and calls
+    :func:`~api.db.DB.InitDatabase` to create the SQLAlchemy engine and
+    session factory.
+
+    On Windows, the repository storage path is swapped to the
+    ``location_windows`` value from the config.
+
+    Returns
+    -------
+    dict
+        The parsed configuration dictionary.
+    """
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     cfg_path = os.path.join(cur_dir, 'cfg.json')
     with open(cfg_path) as f:
@@ -46,6 +127,14 @@ def load_config():
 
 
 def add_user(args):
+    """Create a new platform user with bcrypt-hashed password.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Must contain: ``username``, ``password``, ``name``.
+        Optional: ``surname``, ``role``.
+    """
     from api.db.DB import DB
     from api.Authentication import hash_password
 
@@ -63,6 +152,14 @@ def add_user(args):
 
 
 def add_patient(args):
+    """Register a new patient record.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Must contain: ``name``.
+        Optional: ``mrn``, ``sex``, ``dob``.
+    """
     from api.db.DB import DB
 
     db = DB()
@@ -80,6 +177,14 @@ def add_patient(args):
 
 
 def add_study(args):
+    """Create a new imaging study for a patient.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Must contain: ``patient_id``, ``modality``.
+        Optional: ``description``, ``institution``.
+    """
     from api.db.DB import DB
 
     db = DB()
@@ -95,6 +200,19 @@ def add_study(args):
 
 
 def run_analysis(args):
+    """Trigger an analysis pipeline on a study (synchronous).
+
+    Creates a ``process`` record, launches the appropriate modality
+    pipeline, and **blocks** until the pipeline thread completes.
+    This is the synchronous counterpart to the ``POST /analysis/``
+    REST endpoint (which is non-blocking).
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Must contain: ``study_id``, ``modality``.
+        Optional: ``parameters`` (JSON string).
+    """
     from api.db.DB import DB
     from ProcessManagement import launch_analysis
 
@@ -120,6 +238,13 @@ def run_analysis(args):
 
 
 def list_findings(args):
+    """List all findings for a study with severity and confidence.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Must contain: ``study_id``.
+    """
     from api.db.DB import DB
 
     db = DB()
@@ -134,6 +259,18 @@ def list_findings(args):
 
 
 def import_dicom(args):
+    """Import a directory of DICOM files into the database.
+
+    Scans the given directory for files, reads each as DICOM (extracting
+    pixel data and metadata), creates a new ``series`` record under the
+    specified study, and registers each DICOM file as an ``image`` row.
+    Non-DICOM files are silently skipped with a warning.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Must contain: ``study_id``, ``directory``.
+    """
     from api.db.DB import DB
     from core.image_io import read_dicom
 

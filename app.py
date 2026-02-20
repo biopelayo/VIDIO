@@ -1,3 +1,81 @@
+"""
+VIDIO Application Entry Point
+===============================
+
+WSGI application factory and development server for the VIDIO
+biomedical image analysis platform.
+
+Architecture
+------------
+The application uses the **Falcon** WSGI framework with the following
+middleware stack (applied in order):
+
+1. :class:`~api.Authentication.AuthMiddleware` — JWT token validation.
+   Exempts ``/auth`` (login) and ``OPTIONS`` preflight requests.
+2. :class:`~api.CORS.CORSComponent` — Cross-Origin Resource Sharing
+   headers for browser-based API clients.
+
+Route Map
+---------
+.. list-table::
+   :header-rows: 1
+
+   * - Endpoint
+     - Resource
+     - Methods
+   * - ``/auth``
+     - :class:`~api.Authentication.AuthResource`
+     - POST (login)
+   * - ``/patients[/{id}]``
+     - :class:`~api.resources.PatientsResource.PatientsResource`
+     - GET, POST, DELETE
+   * - ``/studies[/{id}][/series|/findings]``
+     - :class:`~api.resources.StudiesResource.StudiesResource`
+     - GET, POST, DELETE
+   * - ``/series[/{id}][/images]``
+     - :class:`~api.resources.SeriesResource.SeriesResource`
+     - GET, POST, DELETE
+   * - ``/images[/{id}]``
+     - :class:`~api.resources.ImagesResource.ImagesResource`
+     - GET, POST, DELETE
+   * - ``/annotations[/{id}]``
+     - :class:`~api.resources.AnnotationsResource.AnnotationsResource`
+     - GET, POST, DELETE
+   * - ``/findings[/{id}]``
+     - :class:`~api.resources.FindingsResource.FindingsResource`
+     - GET, POST
+   * - ``/processes[/{id}]``
+     - :class:`~api.resources.ProcessesResource.ProcessesResource`
+     - GET
+   * - ``/users[/{id}]``
+     - :class:`~api.resources.UsersResource.UsersResource`
+     - GET, POST, DELETE
+   * - ``/uploads``
+     - :class:`~api.resources.UploadsResource.UploadsResource`
+     - POST (multipart)
+   * - ``/models[/{id}]``
+     - :class:`~api.resources.ModelsResource.ModelsResource`
+     - GET, POST
+   * - ``/analysis/{modality}``
+     - :class:`~api.resources.AnalysisResource.AnalysisResource`
+     - POST (triggers async pipeline)
+
+Running
+-------
+**Development** ::
+
+    python app.py
+
+**Production** (gunicorn) ::
+
+    gunicorn app:application -w 4 -b 0.0.0.0:7070
+
+See Also
+--------
+:mod:`VidioTool` : CLI administrative tool.
+:mod:`ProcessManagement` : Async pipeline orchestration.
+"""
+
 import os
 import sys
 import json
@@ -34,6 +112,22 @@ log = logging.getLogger(__name__)
 
 
 def create_app():
+    """Create and configure the Falcon WSGI application.
+
+    Performs the following initialisation steps:
+
+    1. Load ``cfg.json`` from the application directory.
+    2. Set the global config singleton (:data:`api.Cfg.gCfg`).
+    3. Adjust repository path for Windows if needed.
+    4. Initialise the PostgreSQL database connection.
+    5. Create the Falcon ``App`` with middleware.
+    6. Register all route handlers.
+
+    Returns
+    -------
+    falcon.App
+        Configured WSGI application ready to serve requests.
+    """
     cur_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(cur_dir, 'cfg.json')) as f:
         cfg = json.load(f)
@@ -118,8 +212,28 @@ def create_app():
     app.add_route('/analysis/radiology', analysis, suffix='radiology')
     app.add_route('/analysis/spatial', analysis, suffix='spatial')
 
+    # --- Static Files (Frontend SPA) ---
+    frontend_dir = os.path.join(cur_dir, 'frontend')
+    app.add_static_route('/static', frontend_dir)
+
+    # Catch-all: serve index.html for SPA routes
+    app.add_sink(_spa_sink(frontend_dir), prefix='/')
+
     log.info('VIDIO application initialized')
     return app
+
+
+def _spa_sink(frontend_dir):
+    """Return a sink callable that serves index.html for unmatched routes."""
+    index_path = os.path.join(frontend_dir, 'index.html')
+
+    def sink(req, resp):
+        resp.status = falcon.HTTP_200
+        resp.content_type = 'text/html; charset=utf-8'
+        with open(index_path, 'r', encoding='utf-8') as f:
+            resp.text = f.read()
+
+    return sink
 
 
 application = create_app()
