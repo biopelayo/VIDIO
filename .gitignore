@@ -32,6 +32,8 @@ uploads/
 *.nii.gz
 *.h5ad
 
+demo_output/
+
 .pytest_cache/
 .coverage
 htmlcov/
