@@ -1,0 +1,55 @@
+# ============================================================
+#  VIDIO — Docker Compose
+#  Starts both the VIDIO app and PostgreSQL database.
+#
+#  Usage:
+#    docker-compose up -d          # Start all services
+#    docker-compose logs -f vidio  # Watch VIDIO logs
+#    docker-compose down           # Stop all services
+# ============================================================
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: vidio-db
+    environment:
+      POSTGRES_DB: vidio
+      POSTGRES_USER: admin_vidio
+      POSTGRES_PASSWORD: vidio2025
+    ports:
+      - "5433:5432"
+    volumes:
+      - vidio_pgdata:/var/lib/postgresql/data
+      - ./SQL/create_db_vidio.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_vidio -d vidio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vidio:
+    build: .
+    container_name: vidio-app
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "7070:7070"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: vidio
+      DB_USER: admin_vidio
+      DB_PASSWORD: vidio2025
+      AUTH_SECRET: vidio-docker-secret-change-in-production
+      REPO_PATH: /data/repo
+    volumes:
+      - vidio_images:/data/repo
+      - vidio_models:/data/models
+
+volumes:
+  vidio_pgdata:
+  vidio_images:
+  vidio_models:

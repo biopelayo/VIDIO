@@ -239,12 +239,20 @@ def _spa_sink(frontend_dir):
 application = create_app()
 
 if __name__ == '__main__':
-    from wsgiref.simple_server import make_server
-
     cfg = api.Cfg.gCfg
     host = cfg.get('server', {}).get('host', '127.0.0.1')
     port = cfg.get('server', {}).get('port', 7070)
 
     log.info(f'Starting VIDIO server on {host}:{port}')
-    with make_server(host, port, application) as httpd:
-        httpd.serve_forever()
+
+    try:
+        # Use waitress (production-quality WSGI server, works on Windows)
+        from waitress import serve
+        log.info('Using waitress WSGI server')
+        serve(application, host=host, port=port)
+    except ImportError:
+        # Fallback to wsgiref for minimal installs
+        from wsgiref.simple_server import make_server
+        log.info('Using wsgiref development server')
+        with make_server(host, port, application) as httpd:
+            httpd.serve_forever()

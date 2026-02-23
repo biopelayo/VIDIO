@@ -98,6 +98,15 @@ function renderSidebar() {
           <div class="nav-item" data-route="/processes">
             <span class="icon">\u21BB</span> Processes
           </div>
+          <div class="nav-item" data-route="/analytics">
+            <span class="icon">\u2637</span> Analytics
+          </div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">AI Models</div>
+          <div class="nav-item" data-route="/models">
+            <span class="icon">\u2726</span> SOTA Models
+          </div>
         </div>
         <div class="nav-section">
           <div class="nav-section-title">Admin</div>

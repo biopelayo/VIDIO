@@ -268,7 +268,10 @@ class AuthResource:
         log = logging.getLogger(__name__)
         try:
             import json
-            data = json.loads(req.bounded_stream.read(req.content_length or 0))
+            raw = req.bounded_stream.read(req.content_length or 0)
+            if isinstance(raw, bytes):
+                raw = raw.decode('utf-8', errors='replace')
+            data = json.loads(raw)
             username = data.get('username')
             password = data.get('password')
 
@@ -297,6 +300,8 @@ class AuthResource:
                 }
             }
         except Exception as ex:
-            log.error(str(ex))
+            import traceback
+            log.error(f'Auth error: {ex}')
+            log.error(traceback.format_exc())
             resp.status = falcon.HTTP_500
             resp.media = {'error': str(ex)}
